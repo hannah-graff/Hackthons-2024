@@ -1,0 +1,450 @@
+---
+title: "Hackathon Three Final"
+format: html
+editor: visual
+---
+
+```{r}
+set_wd()
+```
+
+## Survival Analysis: Individuals with & without CHD
+
+```{r}
+library(tidyverse)
+library(lme4)
+library(gtable)
+library(gt)
+library(gtsummary)
+library(survival)
+library(naniar)
+library(knitr)
+library(kableExtra)
+
+data_r = as.data.frame(readRDS('/Users/kathleen/SDS/REU/Hackathon Three/Hackathon Three/nhanes_fda_with_r.rds'))
+nhanes <- readRDS("/Users/kathleen/SDS/REU/Hackathon Three/Hackathon Three/nhanes_fda_with_r.rds")
+nhanes_full <- readRDS("/Users/kathleen/SDS/REU/Hackathon Three/Hackathon Three/nhanes_fda_with_r_ml.rds")
+
+str(nhanes)
+```
+
+## EDA/Visuals
+
+selecting only to our criteria of 50+, answering yes or no to CHD
+
+```{r}
+nhanes_heart <- nhanes |> filter(CHD %in% c("Yes", "No") & !is.na(event) & age >=50) 
+
+CHD <- nhanes_heart |>
+  filter(CHD == "Yes")
+
+noCHD <- nhanes_heart |>
+  filter(CHD == "No")
+
+nhanes_plot <- nhanes |> filter(CHD %in% c("Yes", "No")) |> group_by(CHD) |> summarise(n = n())
+
+```
+
+### Activity Over the Day CHD vs non-CHD
+
+```{r}
+MIMS_group <- c()
+MIMs_day <- list()
+
+for(i in 1:nrow(nhanes_plot)){
+  SEQN_group <- nhanes$SEQN[which(nhanes$CHD == nhanes_plot$CHD[i])]
+  MIMS_group <- rbind(MIMS_group, colMeans(nhanes$MIMS[which(nhanes$SEQN %in% SEQN_group),],na.rm = TRUE))
+}
+
+colnames(MIMS_group) <- 1:1440
+
+for(i in 1:nrow(MIMS_group)) {
+  data_sm <- data.frame(MIMS = MIMS_group[i,], time = 1:1440)
+  fit <- gam(MIMS ~ s(time, bs = "cc"), data = data_sm)
+  MIMS_group[i,] <- fit$fitted.values
+}
+
+nhanes_plot <- data.frame(nhanes_plot, MIMS_group)
+
+nhanes_plot2 <- pivot_longer(nhanes_plot, cols = paste0("X",1:1440), names_to = "minute", values_to = "MIMS") 
+nhanes_plot2$minute <- as.numeric(str_sub(nhanes_plot2$minute, start = 2))
+nhanes_plot2$CHD <- as.factor(nhanes_plot2$CHD)
+
+
+plot2 <- ggplot(data = nhanes_plot2, aes(x = minute, y = MIMS, color = CHD, linewidth = 3)) +
+  theme_classic() +
+  geom_line(linewidth = 4) +
+  scale_x_continuous(breaks = c(1,6,12,18,23)*60, 
+                     labels = c("01:00","06:00","12:00","18:00","23:00")) +
+  scale_y_continuous(breaks = c(4,8,12,16), limits = c(0, 16)) +
+  labs(x = "Time of Day", y = "MIMS", color = "CHD") + 
+  scale_color_manual(values = c("#981f1f", "#f8d3d3")) + 
+  theme_bw()
+
+plot2
+```
+
+### Proportion Dying 
+
+```{r}
+nhanes_heart |>
+  group_by(CHD) |>
+  summarise(prop =  sum(event == 1)/n()) |> 
+  ggplot(aes(x = CHD, y = prop, fill = CHD)) + 
+  geom_col()+ 
+  scale_fill_manual(values = c("#981f1f", "#f8d3d3")) + 
+  theme_bw() + 
+  labs(y = "Proportion Who Died Before the End of 2019")
+
+nhanes_heart |>
+  group_by(time)
+```
+```{r}
+yesCHD |>
+  mutate(Event = fct_recode(factor(event), Died = "0", Survived = "1")) |>
+  ggplot(aes(x = TMIMS, fill=TMIMS_group)) +
+  geom_histogram() +
+  theme_bw() + 
+  scale_fill_manual(values = c("Little" = "#981f1f", "Some" = "#e86f6f", "More" = "#f8d3d3", "A lot" = "#72b0e8", "Most" = "#0b5394")) + 
+  facet_wrap(~Event) + 
+  labs(title = "With CHD", fill="Level of TMIMS")
+
+
+noCHD |>
+  mutate(Event = fct_recode(factor(event), Died = "0", Survived = "1")) |>
+  ggplot(aes(x = TMIMS, fill=TMIMS_group)) +
+  geom_histogram() +
+  theme_bw() + 
+  scale_fill_manual(values = c("Little" = "#981f1f", "Some" = "#e86f6f", "More" = "#f8d3d3", "A lot" = "#72b0e8", "Most" = "#0b5394")) + 
+  facet_wrap(~Event) + 
+  labs(title = "Without CHD", fill="Level of TMIMS")  + theme(legend.position="bottom")
+```
+
+### Exploratory Visuals
+```{r}
+nhanes_heart |>
+  ggplot(aes(x = PIR)) + 
+  geom_density()
+
+nhanes_heart |>
+  ggplot(aes(x = BMI)) + 
+  geom_density()
+
+nhanes_heart |>
+  ggplot(aes(x = age)) + 
+  geom_density() + 
+  facet_wrap(~CHD)
+
+nhanes_heart |>
+  ggplot(aes(x = TMIMS)) + 
+  geom_density() + 
+  facet_wrap(~CHD)
+
+```
+
+### All Summary Tables
+
+```{r}
+#Total Table One
+nhanes |>
+  mutate(Age = age, 
+         Gender = gender, 
+         Race = race, 
+         `Died` = case_when(is.na(event) == T ~ NA, 
+                            event == 0 ~ "No", 
+                            event == 1 ~ "Yes"), 
+         `Total Activity` = TMIMS,
+         `Poverty Income Ratio` = PIR, 
+         `Education` = education) |>
+  select(Age, Gender, Race, BMI, CHD) |>
+  tbl_summary()
+
+nhanes |>
+  mutate(Age = age, 
+         Gender = gender, 
+         Race = race, 
+         `Died` = case_when(is.na(event) == T ~ NA, 
+                            event == 0 ~ "No", 
+                            event == 1 ~ "Yes"), 
+         `Total Activity` = TMIMS,
+         `Poverty Income Ratio` = PIR, 
+         `Education` = education) |>
+  select(`Total Activity`, `Poverty Income Ratio`, education) |>
+  tbl_summary()
+
+CHD |>
+  mutate(Age = age, 
+         Gender = gender, 
+         Race = race, 
+         `Died` = case_when(is.na(event) == T ~ NA, 
+                            event == 0 ~ "No", 
+                            event == 1 ~ "Yes"), 
+         `Total Activity` = TMIMS,
+         `Poverty Income Ratio` = PIR, 
+         `Education` = education) |>
+  select(Age, Gender, Race, BMI, Died) |>
+  tbl_summary()
+         
+ CHD |>
+  mutate(Age = age, 
+         Gender = gender, 
+         Race = race, 
+         `Died` = case_when(is.na(event) == T ~ NA, 
+                            event == 0 ~ "No", 
+                            event == 1 ~ "Yes"), 
+         `Total Activity` = TMIMS,
+         `Poverty Income Ratio` = PIR, 
+         `Education` = education) |>        
+ select(`Total Activity`, `Poverty Income Ratio`, education) |>
+  tbl_summary()
+
+noCHD |>
+  mutate(Age = age, 
+         Gender = gender, 
+         Race = race, 
+         `Died` = case_when(is.na(event) == T ~ NA, 
+                            event == 0 ~ "No", 
+                            event == 1 ~ "Yes"), 
+         `Total Activity` = TMIMS,
+         `Poverty Income Ratio` = PIR, 
+         `Education` = education) |>
+  select(Age, Gender, Race, BMI, Died) |>
+  tbl_summary()
+
+noCHD |>
+  mutate(Age = age, 
+         Gender = gender, 
+         Race = race, 
+         `Died` = case_when(is.na(event) == T ~ NA, 
+                            event == 0 ~ "No", 
+                            event == 1 ~ "Yes"), 
+         `Total Activity` = TMIMS,
+         `Poverty Income Ratio` = PIR, 
+         `Education` = education) |>         
+         select(Died, `Total Activity`, `Poverty Income Ratio`, education) |>
+  tbl_summary()
+
+
+
+```
+
+### Running Single Predictor Models - NOT DONE
+
+```{r}
+
+for (col_name in colnames(yesCHD)[c(4:8, 10:11)]) {
+  formula <- as.formula(paste("Surv(time, event) ~ ", col_name))
+  
+  model1 <- coxph(formula, data = yesCHD)
+  print(paste0("Surv(time, event) ~ ", col_name, " for people with CHD"))
+  print(summary(model1))
+  
+  model2 <- coxph(formula, data = noCHD)
+  print(paste0("Surv(time, event) ~ ", col_name, " for people without CHD"))
+  print(summary(model2))
+}
+
+fit_M1 <- coxph(Surv(time, event) ~ age + gender + race, data = yesCHD)
+summary(fit_M1, conf.int = FALSE)
+```
+
+
+### Running Selection Models
+Those with CHD
+```{r}
+miss_var_summary(yesCHD)
+yesCHD <- yesCHD |>
+  filter(!is.na(BMI) & !is.na(PIR)) |> 
+  mutate(education = fct_collapse(education, 
+                                  "High School or less" = c("High school equivalent", "Refused", "Don't know"), 
+                                  "More than high school" = c("More than high school")))
+
+
+intercept.only <-  coxph(Surv(time, event) ~ 1, data = yesCHD)
+full.model <- coxph(Surv(time, event) ~ age + gender + race + BMI + PIR + education + TMIMS, data = yesCHD)
+
+CHD.predict.aic <- step(intercept.only, scope = list(lower = intercept.only, upper = full.model), direction="both", k = 2)
+
+summary(CHD.predict.aic)
+
+yes <- as.data.frame(summary(CHD.predict.aic)$coef)
+rownames(yes) <- c("Age", "PIR", "Activity", "High School or Less Education", "More than High School")
+colnames(yes) <- c("Coef", "Exp()", "SE", "z", "p-val")
+
+yes |>
+    kbl(digits = 3) %>%
+  kable_classic( html_font = "Cabin")
+```
+
+Those without CHD
+```{r}
+noCHD <- noCHD |>
+  filter(!is.na(BMI) & !is.na(PIR)) |> 
+  mutate(education = fct_collapse(education, 
+                                  "High School or less" = c("High school equivalent", "Refused", "Don't know"), 
+                                  "More than high school" = c("More than high school")))
+
+nointercept.only <-  coxph(Surv(time, event) ~ 1, data = noCHD)
+nofull.model <- coxph(Surv(time, event) ~ age + gender + race + BMI + PIR + education + TMIMS, data = noCHD, iter.max = 100)
+
+noCHD.predict.aic <- step(nointercept.only, scope = list(lower = nointercept.only, upper = nofull.model), direction="both", k = 2)
+
+test <- as.data.frame(summary(noCHD.predict.aic)$coef)
+
+rownames(test) <- c("Age", "Total Activity", "PIR", "BMI", "Female", "Other Hispanic", "Non-Hispanic White", "Non-Hispanic Black", "Non-Hispanic Asian", "Other Race")
+
+colnames(test) <- c("Coef", "Exp()", "SE", "z", "p-val")
+
+test |>
+    kbl(digits = 5) %>%
+  kable_classic( html_font = "Cabin")
+```
+
+### Too much exercise? NOT DONE
+```{r}
+
+#Looks like increased exercise more quickly decreases the odds of dying for those with CHD versus without
+nhanes_heart |>
+  ggplot(aes(x = TMIMS, y = event)) + 
+  geom_point() + 
+  facet_wrap(~CHD) + 
+  stat_smooth(method="glm", color= "#f8d3d3", se=FALSE, 
+                method.args = list(family=binomial)) + 
+  theme_minimal() + 
+  labs(y = "Died (1) or Survived (0)")
+
+yesCHD <- yesCHD |> mutate(TMIMS_group = factor(case_when(TMIMS < 4500 ~ "Little", 
+                                                  TMIMS >=4500 & TMIMS <9000~ "Some", 
+                                                  TMIMS >=9000 & TMIMS <13500 ~ "More", 
+                                                  TMIMS >=13500 & TMIMS <17000 ~ "A lot", 
+                                                  TMIMS >=17000 ~ "Most"), 
+                                                  levels = c("Most", "Little", "Some", "More", "A lot")))
+
+yesCHD |>
+  filter(TMIMS_group == "Most") |> 
+  summarise(n = n())
+
+yesActiveNum <- coxph(Surv(time, event) ~ TMIMS, data = yesCHD)
+summary(yesActiveNum)
+yesActiveCat <- coxph(Surv(time, event) ~ TMIMS_group, data = yesCHD)
+summary(yesActiveCat)
+
+
+noCHD <- noCHD |> mutate(TMIMS_group = factor(case_when(TMIMS < 5000 ~ "Little", 
+                                                  TMIMS >=5000 & TMIMS <10000 ~ "Some", 
+                                                  TMIMS >=10000 & TMIMS <15000 ~ "More", 
+                                                  TMIMS >=15000 & TMIMS <20000 ~ "A lot", 
+                                                  TMIMS >=20000 ~ "Most"),
+                                                  levels = c("Most", "Little", "Some", "More", "A lot")))
+
+noActiveNum <- coxph(Surv(time, event) ~ TMIMS, data = noCHD)
+summary(noActiveNum)
+noActiveCat <- coxph(Surv(time, event) ~ TMIMS_group, data = noCHD)
+summary(noActiveCat)
+```
+
+### Visualizing "Too much" exercise
+```{r}
+yesCHD |>
+  mutate(Event = fct_recode(factor(event), Survived = "0", Died = "1")) |>
+  group_by(TMIMS_group, Event) |>
+  summarize(n=n()) |>
+  mutate(prop = n/sum(n)) |>
+  ggplot(aes(x = TMIMS_group, y=prop, fill=TMIMS_group)) +
+  geom_col() +
+  theme_bw() + 
+  scale_fill_manual(values = c("Little" = "#981f1f", "Some" = "#e86f6f", "More" = "#f8d3d3", "A lot" = "#72b0e8", "Most" = "#0b5394")) + 
+  facet_wrap(~Event) + 
+  labs(title = "With CHD", fill="Level of TMIMS") + 
+  geom_text(aes(label=n),vjust = -0.25)
+
+noCHD |>
+  mutate(Event = fct_recode(factor(event), Survived = "0", Died = "1")) |>
+  group_by(TMIMS_group, Event) |>
+  summarize(n=n()) |>
+  mutate(prop = n/sum(n)) |>
+  ggplot(aes(x = TMIMS_group, y=prop, fill=TMIMS_group)) +
+  geom_col() +
+  theme_bw() + 
+  scale_fill_manual(values = c("Little" = "#981f1f", "Some" = "#e86f6f", "More" = "#f8d3d3", "A lot" = "#72b0e8", "Most" = "#0b5394")) + 
+  facet_wrap(~Event) + 
+  labs(title = "Without CHD", fill="Level of TMIMS") + 
+  geom_text(aes(label=n),vjust = -0.25)
+```
+### Unused Exploration/Visuals
+```{r}
+
+nhanes_heart <- nhanes_heart %>%
+  mutate(mex_am = ifelse(race=="Mexican American", 1, 0),
+         other_hisp = ifelse(race=="Other Hispanic", 1, 0),
+         white = ifelse(race=="Non-Hispanic White", 1, 0),
+         black = ifelse(race=="Non-Hispanic Black", 1, 0),
+         asian = ifelse(race=="Non-Hispanic Asian", 1, 0),
+         other = ifelse(race=="Other Race", 1, 0))
+
+# For race
+summary(coxph(Surv(time, event) ~ mex_am + other_hisp + white + black + asian + other, data=noCHD))
+summary(coxph(Surv(time, event) ~ mex_am + other_hisp + white + black + asian + other, data=yesCHD))
+```
+
+```{r}
+ggplot(nhanes_heart %>% group_by(CHD, event) %>% summarize(n=n()) %>% 
+         mutate(prop = n/sum(n)), aes(x=factor(event), y=prop, fill=CHD)) + 
+  geom_col(position = "dodge") + 
+  scale_fill_manual(values = c("No" = "#981f1f", "Yes" = "#f8d3d3")) + 
+  theme_bw()
+```
+
+```{r}
+data_r <- data_r %>%
+  mutate(age_group = ifelse(age < 18, "Under 18", ifelse(age >= 18 & age < 30, "18-29", ifelse(age >= 30 & age < 49, "30-49", ifelse(age >= 50 & age < 80, "50-79", "80+"))))) %>%
+  mutate(age_group = fct_relevel(age_group,
+                                 "Under 18", "18-29", "30-49", "50-79", "80+"))
+
+data_r <- data_r %>%
+  mutate(weight_category = ifelse(BMI < 18.5, "Underweight", ifelse(BMI >= 18.5 & BMI < 25, "Healthy Weight", ifelse(BMI >= 25 & BMI < 30, "Overweight", "Obese")))) %>%
+  mutate(weight_category = fct_relevel(weight_category, "Underweight", "Healthy Weight", "Overweight", "Obese"))
+
+ggplot(data_r %>% group_by(age_group, weight_category) %>% 
+  summarize(n = n()) %>%
+  mutate(freq = n / sum(n)), aes(x=age_group, y=freq, fill=weight_category)) + geom_col(position="dodge") + labs(title = "Proportion of Weight Cateory given Age Group")
+
+ggplot(data_r %>% group_by(weight_category, age_group) %>% 
+  summarize(n = n()) %>%
+  mutate(freq = n / sum(n)), aes(x=weight_category, y=freq, fill=age_group)) + geom_col(position="dodge") + labs(title = "Proportion of Age Group given Weight Cateory")
+
+ggplot(data_r %>% filter(event==1 | event==0), aes(x=gender, fill=factor(event))) + geom_bar()
+ggplot(data_r %>% filter(event==1 | event==0), aes(x=race, fill=factor(event))) + geom_bar()
+ggplot(data_r %>% filter(event==1 | event==0), aes(x=education, fill=factor(event))) + geom_bar()
+
+ggplot(data_r, aes(x=BMI, fill=weight_category)) + geom_histogram(bins=25)
+ggplot(data_r, aes(x=weight_category, fill=age_group)) + geom_bar(position="dodge")
+
+ggplot(data_r, aes(x=CHD)) + geom_bar()
+
+
+
+ggplot(data_r %>% filter(CHD=="Yes" | CHD=="No"), aes(x=age_group, fill=CHD)) + geom_bar(position="dodge")
+
+# 50-79/ALL
+ggplot(data_r %>% filter(CHD=="Yes" | CHD=="No") %>%
+  group_by(CHD, age_group) %>%
+  summarize(n = n()) %>%
+  mutate(freq = n / sum(n)), aes(x=age_group, y=freq, fill=CHD)) + geom_col(position="dodge") + 
+  labs(x="Age Group", y="Proportion of (non-) CHD participants per age group")
+
+
+
+
+
+ggplot(data_r, aes(x=age_group)) + geom_bar()
+ggplot(data_r, aes(x=age)) + geom_histogram()
+ggplot(data_r, aes(x=factor(event), fill=age_group)) + geom_bar(position="dodge") + theme_bw()
+```
+
+```{r}
+data_r$index <- seq.int(nrow(data_r))
+data_r %>% select(index, SEQN, time, event, age, BMI, race, gender, CHD) %>% filter(SEQN==64759)
+```
+
+
