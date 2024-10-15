@@ -1,0 +1,389 @@
+---
+title: "hackathon"
+format: html
+editor: visual
+---
+
+# data loading + EDA
+
+```{r}
+#| label: loading-pkgs-and-eda 
+
+library(tidyverse)
+library(gt)
+library(scales)
+library(paletteer)
+library(dplyr)
+library(mgcv)
+library(lme4)
+library(ggplot2)
+cti <- read_csv("/Users/nicholezhang/Downloads/cti_episodes.csv")
+
+
+cti |> 
+  group_by(subtype) |> 
+  ggplot(aes(x = subtype)) + 
+  geom_bar()
+
+#demographics of the participants 
+cti_demog <- cti |> 
+  distinct(user_id, race, income, education, employment_status, gender, age)
+
+
+
+cti_demog |> 
+  group_by(gender) |>
+  ggplot(aes(x = gender)) + 
+  geom_bar(fill = "deeppink4", color = "lightblue3") + 
+  labs(title = "Gender of Study Participants") + 
+  xlab("Gender") + 
+  ylab("Count") + 
+  theme_minimal()
+
+
+cti_demog |> 
+  group_by(race) |> 
+  ggplot(aes(x = race)) + 
+  geom_bar(fill = "lightpink2", color = "maroon") + 
+  labs(title = "Race of Study Participants") + 
+  xlab("Race") + 
+  ylab("Count") + 
+  theme_minimal() + 
+  geom_hline(yintercept = 30)
+
+
+
+
+```
+
+# pretty pictures!
+
+```{r}
+#| label: pretty pictures! 
+
+#find proportions spent on each activity subtype for each person
+cti <- cti |> 
+  mutate(subtype = case_match(subtype, 
+             "HOME" ~ "Home", 
+             "CAR" ~ "Car", 
+             "PERSONAL_BUSINESS" ~ "Personal Business", 
+             "EAT_OUT" ~ "Eat Out", 
+             "BIKE" ~ "Bike", 
+             "BUS" ~ "Bus", 
+             "EDUCATION" ~ "Education", 
+             "LEISURE_RECREATION" ~ "Recreation", 
+             "OTHER" ~ "Other", 
+             "RAIL" ~ "Rail", 
+             "SHOP" ~ "Shop", 
+             "WALK" ~ "Walk", 
+             "WORK" ~ "Work")) 
+
+
+cti_props <- cti |> 
+  #filter(type == "TRIP") |> 
+  #filter(type == "ACTIVITY") |> 
+  #filter(employment_status != "Homemaker or Stay at Home") |> 
+  group_by(user_id, subtype, gender) |> 
+  summarize(total_time = sum(dur_min)) |> 
+  ungroup() |> 
+  group_by(user_id) |> 
+  mutate(proportion = total_time / sum(total_time)) 
+
+#find proportions by gender 
+avg_props <- cti_props |> 
+  group_by(subtype, gender) |> 
+  filter(gender %in% c("Man", "Woman")) |>
+  summarize(avg_prop = mean(proportion)) |> 
+  mutate(avg_prop = as.numeric(avg_prop))
+
+#domain for pretty table colors 
+full_val_range <- avg_props %>% 
+  ungroup %>%
+  select_if(is.numeric) %>% 
+  range
+  
+#make table with pretty colors!!
+ avg_props |> 
+  pivot_wider(names_from = subtype, 
+              values_from = avg_prop) |>
+  gt() |> 
+  data_color(domain = full_val_range, 
+             palette = c("white", "darkblue")) 
+
+#make pretty stacked barplot 
+avg_props |>
+  ggplot(aes(x = subtype, y = avg_prop, fill = gender)) + 
+  geom_bar(stat = "identity") + 
+  theme_minimal() + 
+  labs(title = "Average Proportion of Time Spent on Activity/Transit by Gender") + 
+  xlab("Activity Type") + 
+  ylab("Average Proportion of Total Time") + 
+  scale_fill_manual(values = 
+                        c("Man" = "darkmagenta", 
+                          "Woman" = "cadetblue")) 
+  
+  
+
+
+```
+
+# okayyy predictions
+
+```{r}
+
+#| label: prediction-EDA 
+
+#have to look at data first. can we predict proportion of time for activity 
+
+cti_men <- cti_props |> 
+  filter(gender == "Man") 
+
+cti_men |> 
+  group_by(subtype) |> 
+  summarize(mean_prop = mean(proportion), 
+            prop_se = var(proportion))
+
+  
+cti_men |> 
+  group_by(user_id) |> 
+  ggplot(aes(x = subtype, y = proportion)) + 
+  #geom_point(alpha = 0.5, size = 4) + 
+  geom_point() + 
+  geom_smooth() + 
+  theme(legend.position="none") + 
+  labs(title = "Spaghetti Plot of Activities by Person")
+
+#find the average number of mins per day each man spends on each activity
+
+
+#df with all days and total time spent on each subtype for each person 
+
+cti_avgmin <- cti |> 
+  #filter(gender == "Man") |> 
+  dplyr::select(user_id, subtype, start_dateonly, gender, 
+         age, race, education, employment_status, income, dur_min) |>
+  group_by(user_id, subtype, start_dateonly) |> 
+  #total time for each activity for each day / user
+  summarize(total_time = sum(dur_min)) |> 
+  ungroup() |> 
+  left_join(cti_demog, by = join_by("user_id"))
+
+
+
+cti_avgmin |> 
+  ggplot(aes(x = subtype, y = total_time, 
+             group = user_id)) + 
+  geom_point(alpha = 0.3) + 
+  theme(legend.position = "none") + 
+  geom_smooth(alpha = 0.3, size = 0, span = 0.5) + 
+  stat_smooth(geom = "line", alpha = 0.3, size = 1, span = 0.5, color = "lightpink4") + 
+ # geom_smooth(alpha = 0.2) + 
+  ylim(0, 1500) + 
+  labs(title = "Time Spent Per Day Per Person for each Activity") + 
+  xlab("Activity") + 
+  ylab("Time (Min)") 
+
+
+#oops i forgot to make na zero 
+cti_minwide <- cti_minwide |> 
+  mutate(gender = as.factor(gender)) |> 
+  mutate(employment_status = as.factor(employment_status)) |> 
+  mutate(user_id = as.factor(user_id)) |> 
+  mutate(across(where(is.numeric), ~replace_na(., 0)))
+
+  
+
+
+ # ggplot(aes(x = subtype, y = total_time, group = user_id)) + 
+  #geom_line()
+ # ungroup() |> 
+  #group_by(user_id, subtype) |> 
+ # summarize(avg_time = mean(total_time))
+
+
+
+
+
+
+cti_avgmin |> 
+  ggplot(aes(x = subtype, y = avg_time, color = user_id)) + 
+  geom_point(alpha = 0.4) + 
+  theme(legend.position = "none") + 
+
+#averages across men
+
+man_activities <- cti_avgmin |> 
+  group_by(subtype) |> 
+  summarize(avg_min = mean(avg_time), 
+            min_var = var(avg_time)) 
+
+
+
+cti_avgmin |>   
+  filter(gender %in% c("Man", "Woman")) |>
+  ggplot(aes(x = total_time, color = income)) + 
+  geom_density() + 
+  facet_wrap(vars(subtype)) + 
+  theme_minimal()
+
+cti_avgmin |> 
+  filter(subtype == "Car") |> 
+  filter(total_time < 120) |>
+  filter(gender %in% c("Man", "Woman")) |> 
+  ggplot(aes(x = total_time, color = gender)) + 
+  geom_density() + 
+  labs(title = "Time Density for Car Time")
+
+```
+
+```{r}
+
+#| label: okayyy-predictions
+
+# need to make the dataframe wider 
+cti_minwide <- cti_avgmin |> 
+  pivot_wider(names_from = subtype, 
+              values_from = total_time) |> 
+  group_by(user_id, start_dateonly) |> 
+  filter(gender %in% c("Man", "Woman")) |> 
+  ungroup()
+
+
+#test_model <- lmer(Home~gender + employment_status + age + 
+ #                    (1| user_id), 
+  #                data = cti_minwide) 
+
+
+#summary(test_model)
+
+ggplot(aes(x = start_dateonly, shape = gender), data = cti_minwide) + 
+  geom_point(aes(y = Home, shape = gender), color = "deeppink4") + 
+  geom_point(aes(y = home_predictions, shape = gender), color = "purple4")
+
+
+cti_minwide |> 
+  ungroup() |>
+  summarize(mean_home = mean(Home, na.rm=TRUE), 
+            mean_predict = mean(home_predictions, na.rm = TRUE))
+
+man_activities |> 
+  arrange(desc(avg_min))
+           
+
+activities <- c("Home", "Work", "Other", "Education", "Recreation", "Personal_Business", 
+                "Bus", "Car", "Eat_Out", "Rail", "Shop", "Walk", "Bike") 
+
+```
+
+```{r}
+#| label: mooooore models 
+
+models <- c()
+
+cti_minwide <- cti_minwide |> 
+  rename("Personal_Business" = "Personal Business") |> 
+  rename(Eat_Out = "Eat Out")
+
+cti_minwide
+
+#make a bunch of models 
+for (act in activities){ 
+  formula <- as.formula(paste(act, "~ gender + employment_status + (1 | user_id)"))
+  print(formula)
+  model <- lmer(formula, data = cti_minwide)
+  models[[act]] <- model
+}
+
+
+
+cti_minwide |>
+  summarize(avg_rail = mean(Rail))
+
+gam_model <- mgcv::gam(Home ~ age + gender + employment_status + (1 | user_id)), 
+                 data = cti_minwide)
+
+summary(gam_model)
+
+gam.check(gam_model)
+
+ggplot(aes(x = age, y = Home, color = gender), data = cti_minwide) + 
+  geom_point() + 
+  geom_smooth()
+
+
+```
+
+```{r}
+#| label: okayyyy-predictions
+
+predictions <- c() 
+
+#add predictions for each activity to the dataframe 
+for(act in activities){ 
+  print(act)
+  model <- models[[act]] 
+  cti_minwide[[paste("predicted_", act)]] <- predict(model, newdata = cti_minwide) 
+} 
+
+
+df_long <- df %>%
+  select(Person, Bike, Walk, Work, Bike_prediction, Walk_prediction, Work_prediction) %>%
+  gather(key = "Activity", value = "Actual", Bike:Work) %>%
+  mutate(Predicted = case_when(
+    Activity == "Bike" ~ Bike_prediction,
+    Activity == "Walk" ~ Walk_prediction,
+    Activity == "Work" ~ Work_prediction
+  )) %>%
+  select(Activity, Actual, Predicted)
+
+
+
+#want dataframe to have a column for subtype, a column with values + a column with predictions
+
+cti_predictions <- cti_minwide |> 
+  gather(key = "Activity", value = "Actual", Bus:Rail) |> 
+  mutate(Predicted = case_match(Activity, 
+                                "Home" ~ `predicted_ Home`, 
+                                "Work" ~ `predicted_ Work`, 
+                                "Other" ~ `predicted_ Other`, 
+                                "Education" ~ `predicted_ Education`, 
+                                "Recreation" ~ `predicted_ Recreation`, 
+                                "Personal_Business" ~ `predicted_ Personal_Business`, 
+                                "Bus" ~ `predicted_ Bus`, 
+                                "Car" ~ `predicted_ Car`, 
+                                "Eat_Out" ~ `predicted_ Eat_Out`, 
+                                "Rail" ~ `predicted_ Rail`, 
+                                "Shop" ~ `predicted_ Shop`, 
+                                "Walk" ~ `predicted_ Walk`, 
+                                "Bike" ~ `predicted_ Bike` 
+                             
+  )) |> 
+  dplyr::select(user_id, gender, Activity, Actual, Predicted)
+
+
+
+ggplot(aes(x = Activity), data = cti_predictions) + 
+  geom_jitter(aes(y = Actual, color = "lightpink"), alpha = 0.3) + 
+  geom_jitter(aes(y = Predicted, color = "deeppink4"), alpha = 0.3) + 
+  #geom_line(aes(y = Predicted, group = gender, color = gender), size = 1.5) + 
+  ylab("Time (min)") + 
+  xlab("Activity") + 
+  labs(title = "Time per Day Spent on Each Activity")  + 
+  theme_minimal() + 
+  scale_color_identity(name = "Legend!", 
+                     breaks = c("lightpink", "deeppink4"), 
+                    labels = c("Actual", "Predicted"), 
+                    guide = "legend")
+
+
+
+ggplot(aes(x = Activity), data = cti_predictions) + 
+  geom_jitter(aes(y = Actual), color = "lightskyblue2", alpha = 0.3) + 
+  geom_line(aes(y = Predicted, group = gender, color = gender), size = 1.5, se = TRUE) + 
+  ylab("Time (min)") + 
+  xlab("Activity") + 
+  labs(title = "Time per Day Spent on Each Activity by Gender") + 
+  scale_color_manual(values = c("olivedrab4", "cyan4"))
+
+
+```
