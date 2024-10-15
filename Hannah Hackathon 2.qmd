@@ -1,0 +1,556 @@
+---
+title: "Hannah Hackathon 2"
+format: html
+editor: visual
+---
+
+## Loading in the data sets
+
+```{r}
+library(ggplot2)
+library(tidyverse)
+library(RColorBrewer)
+
+# read file
+srh <- read.csv('cleaned_use_of_srh_and_access_existing_resources_2023.csv')
+first <- read.csv('cleaned_first_survey_on_sexual_and_reproductive_health.csv')
+kit_requests <- read.csv('cleaned_kit_requests_F22_S23.csv')
+kit_survey <- read.csv('cleaned_jic_sexual_and_reproductive_kit_survey_6-29-2023.csv')
+```
+
+## Combining Data Sets
+
+```{r}
+# Do you feel comfortable buying contraceptive products?
+s <- srh %>% group_by(Comfortable.Buying.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f <- first %>% group_by(Comfortable.Buying.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra <- full_join(s, f)
+contra <- contra %>% mutate(q = "Comfort in Buying Contraceptives")
+
+ggplot(contra, aes(time, prop_of_comf_buy_contra, group = Comfortable.Buying.Contraceptives, color = Comfortable.Buying.Contraceptives)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# Are contraceptive products available on UMR’s campus?
+s2 <- srh %>% group_by(Contraceptives.Availability.at.UMR) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f2 <- first %>% group_by(Contraceptives.Availability.at.UMR) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra2 <- full_join(s2, f2)
+contra2 <- contra2 %>% mutate(q = "Availability of Contraceptives")
+
+ggplot(contra2, aes(time, prop_of_comf_buy_contra, group = Contraceptives.Availability.at.UMR, color = Contraceptives.Availability.at.UMR)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Availability of Contraceptives")
+
+# How does UMR provide access to sexual health education?
+table(srh$Access.to.Sexual.Health.Education)
+s3 <- srh %>% group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f3 <- first %>% group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra3 <- full_join(s3, f3)
+contra3 <- contra3 %>% mutate(q = "Access to Sex Ed")
+
+ggplot(contra3, aes(time, prop_of_comf_buy_contra, group = Access.to.Sexual.Health.Education, color = Access.to.Sexual.Health.Education)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# How does UMR provide access to sexual health services?
+table(srh$Access.to.Sexual.Health.Services)
+s4 <- srh %>% group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f4 <- first %>% group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra4 <- full_join(s4, f4)
+contra4 <- contra4 %>% mutate(q = "Access to Sex Health Services")
+
+ggplot(contra4, aes(time, prop_of_comf_buy_contra, group = Access.to.Sexual.Health.Services, color = Access.to.Sexual.Health.Services)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# How does UMR provide access to onsite resources of contraceptives that do not require a prescription (ex. condoms, spermicides etc)?
+table(srh$Access.to.Over.the.Counter.Contraceptives)
+s5 <- srh %>% group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f5 <- first %>% group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra5 <- full_join(s5, f5)
+contra5 <- contra5 %>% mutate(q = "Access to Contraceptives")
+
+ggplot(contra5, aes(time, prop_of_comf_buy_contra, group = Access.to.Over.the.Counter.Contraceptives, color = Access.to.Over.the.Counter.Contraceptives)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+```
+
+```{r}
+# FOR LATER
+srh <- srh %>% mutate(use_of_services = ifelse(Onsite.Contraceptive.Resources.Usage==1, 1, ifelse(Sexual.Health.Education.Usage==1, 1, ifelse(Sexual.Health.Services.Usage==1, 1, 1))))
+srh %>% select(Onsite.Contraceptive.Resources.Usage, Sexual.Health.Education.Usage, Sexual.Health.Services.Usage, use_of_services)
+
+first <- first %>% mutate(use_of_services = ifelse(Onsite.resources.of.contraceptives.Usage==1, 1, ifelse(Sexual.Health.Education.Usage==1, 1, ifelse(Sexual.Health.Services.Usage==1, 1, 1))))
+first %>% select(Onsite.resources.of.contraceptives.Usage, Sexual.Health.Education.Usage, Sexual.Health.Services.Usage, use_of_services)
+```
+
+```{r}
+contra_step <- full_join(contra %>% filter(Comfortable.Buying.Contraceptives=="Yes"), contra2 %>% filter(Contraceptives.Availability.at.UMR=="Yes"))
+contra_step2 <- full_join(contra_step, contra3 %>% filter(Access.to.Sexual.Health.Education=="Easy Access"))
+contra_step3 <- full_join(contra_step2, contra4 %>% filter(Access.to.Sexual.Health.Services=="Easy Access"))
+contra_all <- full_join(contra_step3, contra5 %>% filter(Access.to.Over.the.Counter.Contraceptives=="Easy Access"))
+
+cols = c("Access to Contraceptives" = "#eadcffff", "Access to Sex Ed" = "#341763ff", "Access to Sex Health Services" = "#8ad8ffff", "Availability of Contraceptives" =  "#b98dffff", "Comfort in Buying Contraceptives" = "#4ca0fbff")
+
+ggplot(contra_all, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size=2) + 
+  geom_line(size=1.25, alpha=0.8) + 
+  labs(x="Time of Survey", y="Proportion of Positive Answers", col="Question", title="Positive Survey Responses over Time") + 
+  theme_bw() + 
+  scale_color_manual(values=cols)
+```
+
+```{r}
+# Access to Sex Ed (neg)
+s3 <- srh %>% 
+  mutate(Access.to.Sexual.Health.Education = fct_collapse(Access.to.Sexual.Health.Education,
+                                                "Easy Access" = "Easy Access",
+                                                "Some Access" = "Some Access",
+                                                "Little/No Access" = c("Minimum Access", "No Access", "Uncertain"))) %>%
+  group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f3 <- first %>% 
+  mutate(Access.to.Sexual.Health.Education = fct_collapse(Access.to.Sexual.Health.Education,
+                                                "Easy Access" = "Easy Access",
+                                                "Some Access" = "Some Access",
+                                                "Little/No Access" = c("Minimum Access", "No Access", "Uncertain"))) %>%
+  group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra3 <- full_join(s3, f3)
+contra3 <- contra3 %>% mutate(q = "Access to Sex Ed")
+
+# Access to Health Surveys (neg)
+s4 <- srh %>% 
+  mutate(Access.to.Sexual.Health.Services = fct_collapse(Access.to.Sexual.Health.Services,
+                                                "Easy Access" = "Easy Access",
+                                                "Some Access" = "Some Access",
+                                                "Little/No Access" = c("Minimum Access", "No Access", "Uncertain"))) %>%
+  group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f4 <- first %>% 
+  mutate(Access.to.Sexual.Health.Services = fct_collapse(Access.to.Sexual.Health.Services,
+                                                "Easy Access" = "Easy Access",
+                                                "Some Access" = "Some Access",
+                                                "Little/No Access" = c("Minimum Access", "No Access", "Uncertain"))) %>%
+  group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra4 <- full_join(s4, f4)
+contra4 <- contra4 %>% mutate(q = "Access to Sex Health Services")
+
+# Access to Over the Counter (neg)
+s5 <- srh %>%
+   mutate(Access.to.Over.the.Counter.Contraceptives = fct_collapse(Access.to.Over.the.Counter.Contraceptives,
+                                                "Easy Access" = "Easy Access",
+                                                "Some Access" = "Some Access",
+                                                "Little/No Access" = c("Minimum Access", "No Access", "Uncertain"))) %>%
+  group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f5 <- first %>% 
+   mutate(Access.to.Over.the.Counter.Contraceptives = fct_collapse(Access.to.Over.the.Counter.Contraceptives,
+                                                "Easy Access" = "Easy Access",
+                                                "Some Access" = "Some Access",
+                                                "Little/No Access" = c("Minimum Access", "No Access", "Uncertain"))) %>%
+  group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra5 <- full_join(s5, f5)
+contra5 <- contra5 %>% mutate(q = "Access to Contraceptives")
+
+contra_step_n <- full_join(contra %>% filter(Comfortable.Buying.Contraceptives=="No"), contra2 %>% filter(Contraceptives.Availability.at.UMR=="No"))
+contra_step2_n <- full_join(contra_step_n, contra3 %>% filter(Access.to.Sexual.Health.Education=="Little/No Access"))
+contra_step3_n <- full_join(contra_step2_n, contra4 %>% filter(Access.to.Sexual.Health.Services=="Little/No Access"))
+contra_all_n <- full_join(contra_step3_n, contra5 %>% filter(Access.to.Over.the.Counter.Contraceptives=="Little/No Access"))
+
+ggplot(contra_all_n, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size=2) + 
+  geom_line(size=1.25, alpha=0.8) + 
+  labs(x="Time of Survey", y="Proportion of Negative Answers", col="Question", title="Negative Survey Responses over Time") + 
+  theme_bw() + 
+  scale_color_manual(values=cols)
+```
+
+## Demographic Understandings
+
+```{r}
+library(gt)
+library(gtsummary)
+
+first %>% select(-Timestamp) %>% tbl_summary()
+srh %>% select(-c(Start.Date, End.Date)) %>% tbl_summary()
+```
+
+```{r}
+# Gender
+cols2 = c("Female" = "#eadcffff", "Male" = "#341763ff", "Other" =  "#b98dffff")
+
+ggplot(first, aes(x="", y=Cleaned.Gender, fill=Cleaned.Gender)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  labs(title="Demographic Breakdown by Gender (First Survey)", fill="Gender Identity") +
+  scale_fill_manual(values=cols2)
+
+ggplot(srh, aes(x="", y=Cleaned.Gender, fill=Cleaned.Gender)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  labs(title="Demographic Breakdown by Gender (Last Survey)", fill="Gender Identity") +
+  scale_fill_manual(values=cols2)
+```
+
+```{r}
+# Race / Ethnicity
+cols3 = c("American Indian or Alaskan Native" = "#8ad8ffff", "Asian / Pacific Islander" = "#341763ff", "Black or African American" =  "#b98dffff", "Hispanic or Latino" = "#ff83bbff", "Two or more races" = "#4ca0fbff", "White" = "#eadcffff", "Other" = "#fef2cbff")
+
+ggplot(first, aes(x="", y=Race, fill=Race)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  labs(title="Demographic Breakdown by Race/Ethnicity (First Survey)", fill="Race/Ethnicity") +
+  scale_fill_manual(values=cols3)
+
+ggplot(srh, aes(x="", y=Race, fill=Race)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  labs(title="Demographic Breakdown by Race/Ethnicity (Last Survey)", fill="Race/Ethnicity") +
+  scale_fill_manual(values=cols3)
+```
+
+```{r}
+# Other?
+cols2 = c("Female" = "#eadcffff", "Male" = "#341763ff", "Other" =  "#b98dffff")
+
+ggplot(first, aes(x="", y=Cleaned.Gender, fill=Cleaned.Gender)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  labs(title="Demographic Breakdown by Gender (First Survey)", fill="Gender Identity") +
+  scale_fill_manual(values=cols2)
+
+ggplot(srh, aes(x="", y=Cleaned.Gender, fill=Cleaned.Gender)) +
+  geom_bar(stat="identity", width=1) +
+  coord_polar("y", start=0) + 
+  theme_void() + 
+  labs(title="Demographic Breakdown by Gender (Last Survey)", fill="Gender Identity") +
+  scale_fill_manual(values=cols2)
+```
+
+```{r}
+# TBD
+ggplot(first, aes(x=UMR.Safe.and.Supportive.Environment, fill=Race)) + 
+  geom_bar(position="dodge")
+
+new <- first %>% group_by(Race, UMR.Safe.and.Supportive.Environment) %>% summarize(n=n()) %>% mutate(prop_of_safe_race = n/sum(n))
+
+ggplot(first, aes(x=prop_of_safe_race, fill=Race)) + 
+  geom_bar(position="dodge")
+
+ggplot(new, aes(x=UMR.Safe.and.Supportive.Environment, y=prop_of_safe_race, group = Race, color = Race)) +
+  geom_point() + 
+  geom_line()
+```
+
+# Split by gender
+
+### Females
+
+```{r}
+srhf <- srh %>% filter(Cleaned.Gender=="Female")
+firstf <- first %>% filter(Cleaned.Gender=="Female")
+
+# Do you feel comfortable buying contraceptive products?
+sf <- srhf %>% group_by(Comfortable.Buying.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+ff <- firstf %>% group_by(Comfortable.Buying.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contraf <- full_join(sf, ff)
+contraf <- contraf %>% mutate(q = "Comfort in Buying Contraceptives")
+
+ggplot(contraf, aes(time, prop_of_comf_buy_contra, group = Comfortable.Buying.Contraceptives, color = Comfortable.Buying.Contraceptives)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# Are contraceptive products available on UMR’s campus?
+s2f <- srhf %>% group_by(Contraceptives.Availability.at.UMR) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f2f <- firstf %>% group_by(Contraceptives.Availability.at.UMR) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra2f <- full_join(s2f, f2f)
+contra2f <- contra2f %>% mutate(q = "Availability of Contraceptives")
+
+ggplot(contra2f, aes(time, prop_of_comf_buy_contra, group = Contraceptives.Availability.at.UMR, color = Contraceptives.Availability.at.UMR)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Availability of Contraceptives")
+
+# How does UMR provide access to sexual health education?
+table(srh$Access.to.Sexual.Health.Education)
+s3f <- srhf %>% group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f3f <- firstf %>% group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra3f <- full_join(s3f, f3f)
+contra3f <- contra3f %>% mutate(q = "Access to Sex Ed")
+
+ggplot(contra3f, aes(time, prop_of_comf_buy_contra, group = Access.to.Sexual.Health.Education, color = Access.to.Sexual.Health.Education)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# How does UMR provide access to sexual health services?
+table(srh$Access.to.Sexual.Health.Services)
+s4f <- srhf %>% group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f4f <- firstf %>% group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra4f <- full_join(s4f, f4f)
+contra4f <- contra4f %>% mutate(q = "Access to Sex Health Services")
+
+ggplot(contra4f, aes(time, prop_of_comf_buy_contra, group = Access.to.Sexual.Health.Services, color = Access.to.Sexual.Health.Services)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# How does UMR provide access to onsite resources of contraceptives that do not require a prescription (ex. condoms, spermicides etc)?
+table(srh$Access.to.Over.the.Counter.Contraceptives)
+s5f <- srhf %>% group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f5f <- firstf %>% group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra5f <- full_join(s5f, f5f)
+contra5f <- contra5f %>% mutate(q = "Access to Contraceptives")
+
+ggplot(contra5f, aes(time, prop_of_comf_buy_contra, group = Access.to.Over.the.Counter.Contraceptives, color = Access.to.Over.the.Counter.Contraceptives)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+```
+
+```{r}
+contra_stepf <- full_join(contraf %>% filter(Comfortable.Buying.Contraceptives=="Yes"), contra2f %>% filter(Contraceptives.Availability.at.UMR=="Yes"))
+contra_step2f <- full_join(contra_stepf, contra3f %>% filter(Access.to.Sexual.Health.Education=="Easy Access"))
+contra_step3f <- full_join(contra_step2f, contra4f %>% filter(Access.to.Sexual.Health.Services=="Easy Access"))
+contra_allf <- full_join(contra_step3f, contra5f %>% filter(Access.to.Over.the.Counter.Contraceptives=="Easy Access"))
+
+cols = c("Access to Contraceptives" = "#eadcffff", "Access to Sex Ed" = "#341763ff", "Access to Sex Health Services" = "#8ad8ffff", "Availability of Contraceptives" =  "#b98dffff", "Comfort in Buying Contraceptives" = "#4ca0fbff")
+
+ggplot(contra_allf, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size=2) + 
+  geom_line(size=1.25, alpha=0.8) + 
+  labs(x="Time of Survey", y="Proportion of Positive Answers", col="Question", title="Positive Survey Responses over Time", subtitle="Females") + 
+  theme_bw() + 
+  scale_color_manual(values=cols)
+```
+
+### Males
+
+```{r}
+srhm <- srh %>% filter(Cleaned.Gender=="Male")
+firstm <- first %>% filter(Cleaned.Gender=="Male")
+
+# Do you feel comfortable buying contraceptive products?
+sm <- srhm %>% group_by(Comfortable.Buying.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+fm <- firstm %>% group_by(Comfortable.Buying.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contram <- full_join(sm, fm)
+contram <- contram %>% mutate(q = "Comfort in Buying Contraceptives")
+
+ggplot(contram, aes(time, prop_of_comf_buy_contra, group = Comfortable.Buying.Contraceptives, color = Comfortable.Buying.Contraceptives)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# Are contraceptive products available on UMR’s campus?
+s2m <- srhm %>% group_by(Contraceptives.Availability.at.UMR) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f2m <- firstm %>% group_by(Contraceptives.Availability.at.UMR) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra2m <- full_join(s2m, f2m)
+contra2m <- contra2m %>% mutate(q = "Availability of Contraceptives")
+
+ggplot(contra2m, aes(time, prop_of_comf_buy_contra, group = Contraceptives.Availability.at.UMR, color = Contraceptives.Availability.at.UMR)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Availability of Contraceptives")
+
+# How does UMR provide access to sexual health education?
+table(srh$Access.to.Sexual.Health.Education)
+s3m <- srhm %>% group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f3m <- firstm %>% group_by(Access.to.Sexual.Health.Education) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra3m <- full_join(s3m, f3m)
+contra3m <- contra3m %>% mutate(q = "Access to Sex Ed")
+
+ggplot(contra3m, aes(time, prop_of_comf_buy_contra, group = Access.to.Sexual.Health.Education, color = Access.to.Sexual.Health.Education)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# How does UMR provide access to sexual health services?
+table(srh$Access.to.Sexual.Health.Services)
+s4m <- srhm %>% group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f4m <- firstm %>% group_by(Access.to.Sexual.Health.Services) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra4m <- full_join(s4m, f4m)
+contra4m <- contra4m %>% mutate(q = "Access to Sex Health Services")
+
+ggplot(contra4m, aes(time, prop_of_comf_buy_contra, group = Access.to.Sexual.Health.Services, color = Access.to.Sexual.Health.Services)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+
+# How does UMR provide access to onsite resources of contraceptives that do not require a prescription (ex. condoms, spermicides etc)?
+table(srh$Access.to.Over.the.Counter.Contraceptives)
+s5m <- srhm %>% group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2023")
+
+f5m <- firstm %>% group_by(Access.to.Over.the.Counter.Contraceptives) %>% summarize(n=n()) %>% mutate(prop_of_comf_buy_contra = n/sum(n)) %>% mutate(time="April 2022")
+
+contra5m <- full_join(s5m, f5m)
+contra5m <- contra5m %>% mutate(q = "Access to Contraceptives")
+
+ggplot(contra5m, aes(time, prop_of_comf_buy_contra, group = Access.to.Over.the.Counter.Contraceptives, color = Access.to.Over.the.Counter.Contraceptives)) + 
+  geom_point() + 
+  geom_line() + 
+  labs(y="Proportion of People Comfortable Buying Contraceptives")
+```
+
+```{r}
+contra_stepm <- full_join(contram %>% filter(Comfortable.Buying.Contraceptives=="Yes"), contra2m %>% filter(Contraceptives.Availability.at.UMR=="Yes"))
+contra_step2m <- full_join(contra_stepm, contra3m %>% filter(Access.to.Sexual.Health.Education=="Easy Access"))
+contra_step3m <- full_join(contra_step2m, contra4m %>% filter(Access.to.Sexual.Health.Services=="Easy Access"))
+contra_allm <- full_join(contra_step3m, contra5m %>% filter(Access.to.Over.the.Counter.Contraceptives=="Easy Access"))
+
+cols = c("Access to Contraceptives" = "#eadcffff", "Access to Sex Ed" = "#341763ff", "Access to Sex Health Services" = "#8ad8ffff", "Availability of Contraceptives" =  "#b98dffff", "Comfort in Buying Contraceptives" = "#4ca0fbff")
+
+ggplot(contra_allm, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size=2) + 
+  geom_line(size=1.25, alpha=0.8) + 
+  labs(x="Time of Survey", y="Proportion of Positive Answers", col="Question", title="Positive Survey Responses over Time") + 
+  theme_bw() + 
+  scale_color_manual(values=cols)
+
+# contra_all %>% summarize(dif_cbc = )
+```
+
+And I keep going...
+
+```{r}
+# Combining Plots?
+library(patchwork)
+comb_m <- contra_allm %>% mutate(q=ifelse(q=="Comfort in Buying Contraceptives", "Comfort in Buying Contraceptives (Male)", ifelse(q=="Availability of Contraceptives", "Availability of Contraceptives (Male)", ifelse(q=="Access to Sex Ed", "Access to Sex Ed (Male)", ifelse(q=="Access to Sex Health Services", "Access to Sex Health Services (Male)", "Access to Contraceptives (Male)")))))
+comb_f <- contra_allf %>% mutate(q=ifelse(q=="Comfort in Buying Contraceptives", "Comfort in Buying Contraceptives (Female)", ifelse(q=="Availability of Contraceptives", "Availability of Contraceptives (Female)", ifelse(q=="Access to Sex Ed", "Access to Sex Ed (Female)", ifelse(q=="Access to Sex Health Services", "Access to Sex Health Services (Female)", "Access to Contraceptives (Female)")))))
+
+comb <- full_join(comb_m, comb_f)
+
+# Together
+cols_comb = c("Access to Contraceptives (Female)" = "#bf0d0d", "Access to Contraceptives (Male)" = "#730505",
+              "Access to Sex Ed (Female)" = "#f2ca18", "Access to Sex Ed (Male)" = "#856e09",
+              "Access to Sex Health Services (Female)" = "#89f218", "Access to Sex Health Services (Male)" = "#3d6b0c", 
+              "Availability of Contraceptives (Female)" =  "#1ac4c1", "Availability of Contraceptives (Male)" =  "#18807e", 
+              "Comfort in Buying Contraceptives (Female)" = "#9a74f2", "Comfort in Buying Contraceptives (Male)" = "#3f179c")
+
+ggplot(comb, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size = 2) + 
+  geom_line(size = 1.25, alpha = 0.8) + 
+  labs(x = "Time of Survey", y = "Proportion of Positive Answers", col = "Question",
+       title = "Positive Survey Responses over Time", subtitle = "Females and Males") + 
+  theme_bw() +
+  scale_color_manual(values = cols_comb)
+
+# Separately
+plot_males <- ggplot(contra_allm, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size = 2) + 
+  geom_line(size = 1.25, alpha = 0.8) + 
+  labs(x = "Time of Survey", y = "Proportion of Positive Answers", col = "Question",
+       title = "Positive Survey Responses over Time", subtitle = "Males") + 
+  theme_bw() + 
+  scale_color_manual(values = cols)
+
+plot_females <- ggplot(contra_allf, aes(time, prop_of_comf_buy_contra, group = q, color = q)) + 
+  geom_point(size = 2) + 
+  geom_line(size = 1.25, alpha = 0.8) + 
+  labs(x = "Time of Survey", y = "Proportion of Positive Answers", col = "Question",
+       title = "Positive Survey Responses over Time", subtitle = "Females") + 
+  theme_bw() + 
+  scale_color_manual(values = cols)
+
+plot_males / plot_females
+```
+
+```{r}
+#Difference in proportions
+diff_dataf <- contra_allf %>%
+  group_by(q) %>%
+  summarize(diff_prop = prop_of_comf_buy_contra[time == "April 2023"] - prop_of_comf_buy_contra[time == "April 2022"]) %>%
+  mutate(genderr="Female")
+
+diff_datam <- contra_allm %>%
+  group_by(q) %>%
+  summarize(diff_prop = prop_of_comf_buy_contra[time == "April 2023"] - prop_of_comf_buy_contra[time == "April 2022"]) %>%
+  mutate(genderr="Male")
+
+diff_comb <- full_join(diff_datam, diff_dataf, by=c("q", "genderr", "diff_prop"))
+diff_comb
+diff_comb %>% mutate(diff = diff_prop_m - diff_prop_f)
+
+ggplot(diff_comb, aes(x=q, y=diff_prop, col=genderr)) + geom_boxplot() + 
+
+for (men_i in seq_along(diff_datam$diff_prop_m)) {
+  print(paste0("For the difference in proportions with regard to ", diff_dataf$q[men_i], ", the difference in proportion is ", diff_datam$diff_prop_m[men_i], " for men and ", diff_dataf$diff_prop_f[men_i], " for women."))
+  # print(prop.test(x=c(abs(diff_datam$diff_prop_m[men_i]), diff_dataf$diff_prop_f[men_i]), n=c(1, 1), p = NULL, alternative = "two.sided"))
+}
+
+
+prop.test(x=c(men_prop), n=c(1, 1), p = NULL, alternative = "two.sided")
+```
+
+```{r}
+# Example data (replace with your actual proportions)
+Men_T1 <- 0.94444444
+Men_T2 <- 1
+Women_T1 <- 0.7567568
+Women_T2 <- 0.8032787
+
+# Create a matrix or data frame for the contingency table
+contingency_table <- matrix(c(Men_T1, Men_T2, Women_T1, Women_T2), nrow = 2, byrow = TRUE,
+                            dimnames = list(Gender = c("Male", "Female"), Time = c("Time1", "Time2")))
+
+# Perform chi-square test for independence
+chisq_result <- chisq.test(contingency_table)
+
+# Print the result
+print(chisq_result)
+
+# Example output interpretation
+# Assuming chisq_result is the result from chisq.test()
+
+cat("Chi-squared test for independence:\n")
+print(chisq_result)
+cat("\n")
+
+cat("Conclusion:\n")
+if (chisq_result$p.value < 0.05) {
+  cat("There is a significant difference between the proportions of men and women who are comfortable buying contraceptives across the two time points.\n")
+} else {
+  cat("There is no significant difference between the proportions of men and women who are comfortable buying contraceptives across the two time points.\n")
+}
+```
